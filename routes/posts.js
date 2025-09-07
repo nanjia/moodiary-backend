@@ -142,6 +142,7 @@ router.get('/', async (req, res) => {
     // 格式化返回数据
     const posts = postsResult.rows.map(post => ({
       ...post,
+      moodType: post.mood_type,
       gpsAddress: post.gps_address,
       gpsLatitude: post.gps_latitude,
       gpsLongitude: post.gps_longitude,
@@ -215,6 +216,7 @@ router.get('/:id', async (req, res) => {
     }
 
     const post = result.rows[0];
+    post.moodType = post.mood_type;
     post.gpsAddress = post.gps_address;
     post.gpsLatitude = post.gps_latitude;
     post.gpsLongitude = post.gps_longitude;
