@@ -7,7 +7,7 @@ const { authenticateToken } = require('../middleware/auth');
 router.post('/', authenticateToken, async (req, res) => {
   try {
     const senderId = req.user.id;
-    const { receiverId, content } = req.body;
+    const { receiverId, content, images, videos } = req.body;
 
     // 验证参数
     if (!receiverId || !content) {
@@ -40,10 +40,10 @@ router.post('/', authenticateToken, async (req, res) => {
 
     // 插入私信
     const result = await query(
-      `INSERT INTO private_messages (sender_id, receiver_id, content, created_at)
-       VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
+      `INSERT INTO private_messages (sender_id, receiver_id, content, images, videos, created_at)
+       VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)
        RETURNING *`,
-      [senderId, receiverId, content]
+      [senderId, receiverId, content, images, videos]
     );
 
     const message = result.rows[0];
@@ -142,6 +142,8 @@ router.get('/', authenticateToken, async (req, res) => {
     const messages = messagesResult.rows.map(msg => ({
       id: msg.id,
       content: msg.content,
+      images: msg.images,
+      videos: msg.videos,
       created_at: msg.created_at,
       is_read: msg.is_read,
       sender_id: msg.sender_id,
@@ -218,6 +220,8 @@ router.get('/:id', authenticateToken, async (req, res) => {
     const message = {
       id: msg.id,
       content: msg.content,
+      images: msg.images,
+      videos: msg.videos,
       createdAt: msg.created_at,
       isRead: msg.is_read,
       sender: {
@@ -365,6 +369,8 @@ router.get('/conversation/:userId', authenticateToken, async (req, res) => {
     const messages = messagesResult.rows.map(msg => ({
       id: msg.id,
       content: msg.content,
+      images: msg.images,
+      videos: msg.videos,
       created_at: msg.created_at,
       is_read: msg.is_read,
       sender_id: msg.sender_id,

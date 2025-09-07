@@ -17,6 +17,7 @@ router.post('/', authenticateToken, validatePost, async (req, res) => {
       gpsAddress,
       tags,
       images,
+      videos,
       isPublic = true
     } = req.body;
 
@@ -24,10 +25,10 @@ router.post('/', authenticateToken, validatePost, async (req, res) => {
 
     const result = await query(
       `INSERT INTO mood_posts 
-       (user_id, mood_type, content, weather, location, gps_latitude, gps_longitude, gps_address, tags, images, is_public)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+       (user_id, mood_type, content, weather, location, gps_latitude, gps_longitude, gps_address, tags, images, videos, is_public)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
        RETURNING *`,
-      [userId, moodType, content, weather, location, gpsLatitude, gpsLongitude, gpsAddress, tags, images, isPublic]
+      [userId, moodType, content, weather, location, gpsLatitude, gpsLongitude, gpsAddress, tags, images, videos, isPublic]
     );
 
     const post = result.rows[0];

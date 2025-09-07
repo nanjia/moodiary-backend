@@ -68,6 +68,7 @@ const initTables = async () => {
         gps_address TEXT,
         tags TEXT[],
         images TEXT[],
+        videos TEXT[],
         is_public BOOLEAN DEFAULT true,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -105,6 +106,8 @@ const initTables = async () => {
         sender_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
         receiver_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
         content TEXT NOT NULL,
+        images TEXT[],
+        videos TEXT[],
         is_read BOOLEAN DEFAULT false,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -141,12 +144,66 @@ const initTables = async () => {
 
     console.log('数据库表初始化完成');
     
+    // 执行数据库迁移
+    await migrateDatabase(client);
+    
     // 创建测试账号
     await createTestAccount(client);
     
     client.release();
   } catch (error) {
     console.error('数据库表初始化失败:', error);
+    throw error;
+  }
+};
+
+// 数据库迁移
+const migrateDatabase = async (client) => {
+  try {
+    console.log('开始执行数据库迁移...');
+    
+    // 为 mood_posts 表添加 videos 字段（如果不存在）
+    try {
+      await client.query(`
+        ALTER TABLE mood_posts 
+        ADD COLUMN IF NOT EXISTS videos TEXT[]
+      `);
+      console.log('mood_posts 表添加 videos 字段成功');
+    } catch (error) {
+      if (!error.message.includes('already exists')) {
+        console.error('添加 videos 字段失败:', error);
+      }
+    }
+    
+    // 为 private_messages 表添加 images 字段（如果不存在）
+    try {
+      await client.query(`
+        ALTER TABLE private_messages 
+        ADD COLUMN IF NOT EXISTS images TEXT[]
+      `);
+      console.log('private_messages 表添加 images 字段成功');
+    } catch (error) {
+      if (!error.message.includes('already exists')) {
+        console.error('添加 images 字段失败:', error);
+      }
+    }
+    
+    // 为 private_messages 表添加 videos 字段（如果不存在）
+    try {
+      await client.query(`
+        ALTER TABLE private_messages 
+        ADD COLUMN IF NOT EXISTS videos TEXT[]
+      `);
+      console.log('private_messages 表添加 videos 字段成功');
+    } catch (error) {
+      if (!error.message.includes('already exists')) {
+        console.error('添加 videos 字段失败:', error);
+      }
+    }
+    
+    console.log('数据库迁移完成');
+  } catch (error) {
+    console.error('数据库迁移失败:', error);
     throw error;
   }
 };
