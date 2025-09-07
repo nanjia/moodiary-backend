@@ -98,6 +98,19 @@ const initTables = async () => {
       )
     `);
 
+    // 创建私信表
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS private_messages (
+        id SERIAL PRIMARY KEY,
+        sender_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        receiver_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        content TEXT NOT NULL,
+        is_read BOOLEAN DEFAULT false,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
     // 创建索引
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_mood_posts_user_id ON mood_posts(user_id);
@@ -108,6 +121,9 @@ const initTables = async () => {
       CREATE INDEX IF NOT EXISTS idx_post_likes_user_id ON post_likes(user_id);
       CREATE INDEX IF NOT EXISTS idx_post_comments_post_id ON post_comments(post_id);
       CREATE INDEX IF NOT EXISTS idx_post_comments_user_id ON post_comments(user_id);
+      CREATE INDEX IF NOT EXISTS idx_private_messages_sender_id ON private_messages(sender_id);
+      CREATE INDEX IF NOT EXISTS idx_private_messages_receiver_id ON private_messages(receiver_id);
+      CREATE INDEX IF NOT EXISTS idx_private_messages_created_at ON private_messages(created_at DESC);
     `);
 
     console.log('数据库表初始化完成');

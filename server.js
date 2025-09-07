@@ -11,6 +11,7 @@ const userRoutes = require('./routes/users');
 const postRoutes = require('./routes/posts');
 const commentRoutes = require('./routes/comments');
 const squareRoutes = require('./routes/square');
+const messageRoutes = require('./routes/messages');
 const { connectDB } = require('./config/database');
 const { errorHandler } = require('./middleware/errorHandler');
 
@@ -60,6 +61,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/posts', postRoutes);
 app.use('/api/comments', commentRoutes);
 app.use('/api/square', squareRoutes);
+app.use('/api/messages', messageRoutes);
 
 // 404处理
 app.use('*', (req, res) => {

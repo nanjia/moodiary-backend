@@ -3,6 +3,39 @@ const router = express.Router();
 const { query } = require('../config/database');
 const { authenticateToken } = require('../middleware/auth');
 
+// 根据ID获取用户信息
+router.get('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await query(
+      'SELECT id, username, nickname, avatar_url, created_at FROM users WHERE id = $1',
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: '用户不存在'
+      });
+    }
+
+    const user = result.rows[0];
+
+    res.json({
+      success: true,
+      data: user
+    });
+  } catch (error) {
+    console.error('获取用户信息失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '获取用户信息失败',
+      error: error.message
+    });
+  }
+});
+
 // 获取当前用户信息
 router.get('/current', authenticateToken, async (req, res) => {
   try {
