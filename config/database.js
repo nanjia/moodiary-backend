@@ -111,6 +111,17 @@ const initTables = async () => {
       )
     `);
 
+    // 创建关注关系表
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS user_follows (
+        id SERIAL PRIMARY KEY,
+        follower_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        following_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(follower_id, following_id)
+      )
+    `);
+
     // 创建索引
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_mood_posts_user_id ON mood_posts(user_id);
@@ -124,6 +135,8 @@ const initTables = async () => {
       CREATE INDEX IF NOT EXISTS idx_private_messages_sender_id ON private_messages(sender_id);
       CREATE INDEX IF NOT EXISTS idx_private_messages_receiver_id ON private_messages(receiver_id);
       CREATE INDEX IF NOT EXISTS idx_private_messages_created_at ON private_messages(created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_user_follows_follower_id ON user_follows(follower_id);
+      CREATE INDEX IF NOT EXISTS idx_user_follows_following_id ON user_follows(following_id);
     `);
 
     console.log('数据库表初始化完成');

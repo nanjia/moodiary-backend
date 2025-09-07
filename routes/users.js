@@ -164,6 +164,15 @@ router.get('/:id/stats', async (req, res) => {
       [id]
     );
 
+    // 获取关注数和粉丝数
+    const followStatsResult = await query(
+      `SELECT 
+        COUNT(CASE WHEN follower_id = $1 THEN 1 END) as following_count,
+        COUNT(CASE WHEN following_id = $1 THEN 1 END) as follower_count
+      FROM user_follows`,
+      [id]
+    );
+
     // 获取心情分布统计
     const moodStatsResult = await query(
       `SELECT 
@@ -186,6 +195,8 @@ router.get('/:id/stats', async (req, res) => {
       publicPostCount: parseInt(postStatsResult.rows[0].public_post_count),
       likeCount: parseInt(likeStatsResult.rows[0].like_count),
       commentCount: parseInt(commentStatsResult.rows[0].comment_count),
+      followerCount: parseInt(followStatsResult.rows[0].follower_count),
+      followingCount: parseInt(followStatsResult.rows[0].following_count),
       moodDistribution
     };
 
@@ -305,6 +316,221 @@ router.get('/:id/posts', async (req, res) => {
     res.status(500).json({
       success: false,
       message: '获取用户动态失败',
+      error: error.message
+    });
+  }
+});
+
+// 关注用户
+router.post('/:id/follow', authenticateToken, async (req, res) => {
+  try {
+    const followerId = req.user.id;
+    const { id: followingId } = req.params;
+
+    // 不能关注自己
+    if (followerId === parseInt(followingId)) {
+      return res.status(400).json({
+        success: false,
+        message: '不能关注自己'
+      });
+    }
+
+    // 检查要关注的用户是否存在
+    const userResult = await query(
+      'SELECT id, username, nickname FROM users WHERE id = $1',
+      [followingId]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: '用户不存在'
+      });
+    }
+
+    // 检查是否已经关注
+    const existingFollow = await query(
+      'SELECT id FROM user_follows WHERE follower_id = $1 AND following_id = $2',
+      [followerId, followingId]
+    );
+
+    if (existingFollow.rows.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: '已经关注过该用户'
+      });
+    }
+
+    // 添加关注关系
+    await query(
+      'INSERT INTO user_follows (follower_id, following_id) VALUES ($1, $2)',
+      [followerId, followingId]
+    );
+
+    res.json({
+      success: true,
+      message: '关注成功'
+    });
+  } catch (error) {
+    console.error('关注用户失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '关注用户失败',
+      error: error.message
+    });
+  }
+});
+
+// 取消关注用户
+router.delete('/:id/follow', authenticateToken, async (req, res) => {
+  try {
+    const followerId = req.user.id;
+    const { id: followingId } = req.params;
+
+    const result = await query(
+      'DELETE FROM user_follows WHERE follower_id = $1 AND following_id = $2 RETURNING *',
+      [followerId, followingId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: '未关注该用户'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: '取消关注成功'
+    });
+  } catch (error) {
+    console.error('取消关注失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '取消关注失败',
+      error: error.message
+    });
+  }
+});
+
+// 检查关注状态
+router.get('/:id/follow-status', authenticateToken, async (req, res) => {
+  try {
+    const followerId = req.user.id;
+    const { id: followingId } = req.params;
+
+    const result = await query(
+      'SELECT id FROM user_follows WHERE follower_id = $1 AND following_id = $2',
+      [followerId, followingId]
+    );
+
+    res.json({
+      success: true,
+      data: {
+        isFollowing: result.rows.length > 0
+      }
+    });
+  } catch (error) {
+    console.error('检查关注状态失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '检查关注状态失败',
+      error: error.message
+    });
+  }
+});
+
+// 获取关注列表
+router.get('/:id/following', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { page = 1, pageSize = 20 } = req.query;
+
+    const offset = (page - 1) * pageSize;
+
+    const result = await query(
+      `SELECT 
+        u.id, u.username, u.nickname, u.avatar_url, uf.created_at as follow_time
+      FROM user_follows uf
+      JOIN users u ON uf.following_id = u.id
+      WHERE uf.follower_id = $1
+      ORDER BY uf.created_at DESC
+      LIMIT $2 OFFSET $3`,
+      [id, pageSize, offset]
+    );
+
+    // 查询总数
+    const countResult = await query(
+      'SELECT COUNT(*) as total FROM user_follows WHERE follower_id = $1',
+      [id]
+    );
+
+    const total = parseInt(countResult.rows[0].total);
+    const totalPages = Math.ceil(total / pageSize);
+
+    res.json({
+      success: true,
+      data: {
+        items: result.rows,
+        total,
+        page: parseInt(page),
+        pageSize: parseInt(pageSize),
+        totalPages
+      }
+    });
+  } catch (error) {
+    console.error('获取关注列表失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '获取关注列表失败',
+      error: error.message
+    });
+  }
+});
+
+// 获取粉丝列表
+router.get('/:id/followers', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { page = 1, pageSize = 20 } = req.query;
+
+    const offset = (page - 1) * pageSize;
+
+    const result = await query(
+      `SELECT 
+        u.id, u.username, u.nickname, u.avatar_url, uf.created_at as follow_time
+      FROM user_follows uf
+      JOIN users u ON uf.follower_id = u.id
+      WHERE uf.following_id = $1
+      ORDER BY uf.created_at DESC
+      LIMIT $2 OFFSET $3`,
+      [id, pageSize, offset]
+    );
+
+    // 查询总数
+    const countResult = await query(
+      'SELECT COUNT(*) as total FROM user_follows WHERE following_id = $1',
+      [id]
+    );
+
+    const total = parseInt(countResult.rows[0].total);
+    const totalPages = Math.ceil(total / pageSize);
+
+    res.json({
+      success: true,
+      data: {
+        items: result.rows,
+        total,
+        page: parseInt(page),
+        pageSize: parseInt(pageSize),
+        totalPages
+      }
+    });
+  } catch (error) {
+    console.error('获取粉丝列表失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '获取粉丝列表失败',
       error: error.message
     });
   }
