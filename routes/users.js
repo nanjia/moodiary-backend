@@ -536,4 +536,40 @@ router.get('/:id/followers', async (req, res) => {
   }
 });
 
+// 更新用户头像
+router.put('/avatar', authenticateToken, async (req, res) => {
+  try {
+    const { avatarUrl } = req.body;
+    const userId = req.user.id;
+
+    if (!avatarUrl) {
+      return res.status(400).json({
+        success: false,
+        message: '头像URL不能为空'
+      });
+    }
+
+    // 更新用户头像
+    await query(
+      'UPDATE users SET avatar_url = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+      [avatarUrl, userId]
+    );
+
+    res.json({
+      success: true,
+      message: '头像更新成功',
+      data: {
+        avatarUrl: avatarUrl
+      }
+    });
+  } catch (error) {
+    console.error('更新头像失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '更新头像失败',
+      error: error.message
+    });
+  }
+});
+
 module.exports = router;
