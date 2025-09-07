@@ -22,9 +22,18 @@ router.get('/:id', async (req, res) => {
 
     const user = result.rows[0];
 
+    // 转换字段名格式
+    const userData = {
+      id: user.id,
+      username: user.username,
+      nickname: user.nickname,
+      avatarUrl: user.avatar_url,
+      createdAt: user.created_at
+    };
+
     res.json({
       success: true,
-      data: user
+      data: userData
     });
   } catch (error) {
     console.error('获取用户信息失败:', error);
@@ -55,9 +64,19 @@ router.get('/current', authenticateToken, async (req, res) => {
 
     const user = result.rows[0];
 
+    // 转换字段名格式
+    const userData = {
+      id: user.id,
+      username: user.username,
+      nickname: user.nickname,
+      avatarUrl: user.avatar_url,
+      createdAt: user.created_at,
+      updatedAt: user.updated_at
+    };
+
     res.json({
       success: true,
-      data: user
+      data: userData
     });
   } catch (error) {
     console.error('获取用户信息失败:', error);
@@ -468,10 +487,19 @@ router.get('/:id/following', async (req, res) => {
     const total = parseInt(countResult.rows[0].total);
     const totalPages = Math.ceil(total / pageSize);
 
+    // 转换字段名格式
+    const items = result.rows.map(row => ({
+      id: row.id,
+      username: row.username,
+      nickname: row.nickname,
+      avatarUrl: row.avatar_url,
+      followTime: row.follow_time
+    }));
+
     res.json({
       success: true,
       data: {
-        items: result.rows,
+        items,
         total,
         page: parseInt(page),
         pageSize: parseInt(pageSize),
@@ -516,10 +544,19 @@ router.get('/:id/followers', async (req, res) => {
     const total = parseInt(countResult.rows[0].total);
     const totalPages = Math.ceil(total / pageSize);
 
+    // 转换字段名格式
+    const items = result.rows.map(row => ({
+      id: row.id,
+      username: row.username,
+      nickname: row.nickname,
+      avatarUrl: row.avatar_url,
+      followTime: row.follow_time
+    }));
+
     res.json({
       success: true,
       data: {
-        items: result.rows,
+        items,
         total,
         page: parseInt(page),
         pageSize: parseInt(pageSize),
