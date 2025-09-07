@@ -30,9 +30,6 @@ const connectDB = async () => {
     
     // 初始化数据库表
     await initTables();
-    
-    // 执行数据库迁移
-    await migrateDatabase();
   } catch (error) {
     console.error('数据库连接失败:', error);
     process.exit(1);
@@ -72,7 +69,6 @@ const initTables = async () => {
         tags TEXT[],
         images TEXT[],
         videos TEXT[],
-        video_thumbnails TEXT[],
         is_public BOOLEAN DEFAULT true,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -149,7 +145,7 @@ const initTables = async () => {
     console.log('数据库表初始化完成');
     
     // 执行数据库迁移
-    await migrateDatabase(client);
+    await migrateDatabase();
     
     // 创建测试账号
     await createTestAccount(client);
@@ -162,13 +158,13 @@ const initTables = async () => {
 };
 
 // 数据库迁移
-const migrateDatabase = async (client) => {
+const migrateDatabase = async () => {
   try {
     console.log('开始执行数据库迁移...');
     
     // 为 mood_posts 表添加 videos 字段（如果不存在）
     try {
-      await client.query(`
+      await query(`
         ALTER TABLE mood_posts 
         ADD COLUMN IF NOT EXISTS videos TEXT[]
       `);
@@ -181,7 +177,7 @@ const migrateDatabase = async (client) => {
     
     // 为 private_messages 表添加 images 字段（如果不存在）
     try {
-      await client.query(`
+      await query(`
         ALTER TABLE private_messages 
         ADD COLUMN IF NOT EXISTS images TEXT[]
       `);
@@ -194,7 +190,7 @@ const migrateDatabase = async (client) => {
     
     // 为 private_messages 表添加 videos 字段（如果不存在）
     try {
-      await client.query(`
+      await query(`
         ALTER TABLE private_messages 
         ADD COLUMN IF NOT EXISTS videos TEXT[]
       `);
@@ -202,19 +198,6 @@ const migrateDatabase = async (client) => {
     } catch (error) {
       if (!error.message.includes('already exists')) {
         console.error('添加 videos 字段失败:', error);
-      }
-    }
-    
-    // 为 mood_posts 表添加 video_thumbnails 字段（如果不存在）
-    try {
-      await client.query(`
-        ALTER TABLE mood_posts 
-        ADD COLUMN IF NOT EXISTS video_thumbnails TEXT[]
-      `);
-      console.log('mood_posts 表添加 video_thumbnails 字段成功');
-    } catch (error) {
-      if (!error.message.includes('already exists')) {
-        console.error('添加 video_thumbnails 字段失败:', error);
       }
     }
     
@@ -271,7 +254,6 @@ const query = async (text, params) => {
 const getClient = async () => {
   return await pool.connect();
 };
-
 
 module.exports = {
   pool,
