@@ -12,6 +12,7 @@ const postRoutes = require('./routes/posts');
 const commentRoutes = require('./routes/comments');
 const squareRoutes = require('./routes/square');
 const messageRoutes = require('./routes/messages');
+const uploadRoutes = require('./routes/upload');
 const { connectDB } = require('./config/database');
 const { errorHandler } = require('./middleware/errorHandler');
 
@@ -46,6 +47,9 @@ app.use(compression());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+// 静态文件服务
+app.use('/uploads', express.static('uploads'));
+
 // 健康检查
 app.get('/health', (req, res) => {
   res.json({ 
@@ -62,6 +66,7 @@ app.use('/api/posts', postRoutes);
 app.use('/api/comments', commentRoutes);
 app.use('/api/square', squareRoutes);
 app.use('/api/messages', messageRoutes);
+app.use('/api/upload', uploadRoutes);
 
 // 404处理
 app.use('*', (req, res) => {
