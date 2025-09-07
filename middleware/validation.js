@@ -16,6 +16,7 @@ const validatePost = (req, res, next) => {
     gpsAddress: Joi.string().max(500).optional(),
     tags: Joi.array().items(Joi.string().max(20)).max(10).optional(),
     images: Joi.array().items(Joi.string().uri()).max(9).optional(),
+    videos: Joi.array().items(Joi.string().uri()).max(3).optional(),
     isPublic: Joi.boolean().optional()
   });
 
