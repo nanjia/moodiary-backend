@@ -61,7 +61,14 @@ router.post('/:postId', authenticateToken, async (req, res) => {
       [userId]
     );
 
-    comment.user = userResult.rows[0];
+    const user = userResult.rows[0];
+    // 转换字段名为前端期望的格式
+    comment.user = {
+      id: user.id,
+      username: user.username,
+      nickname: user.nickname,
+      avatarUrl: user.avatar_url
+    };
 
     res.status(201).json({
       success: true,
