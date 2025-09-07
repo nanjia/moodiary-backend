@@ -30,6 +30,9 @@ const connectDB = async () => {
     
     // 初始化数据库表
     await initTables();
+    
+    // 执行数据库迁移
+    await migrateDatabase();
   } catch (error) {
     console.error('数据库连接失败:', error);
     process.exit(1);
@@ -69,6 +72,7 @@ const initTables = async () => {
         tags TEXT[],
         images TEXT[],
         videos TEXT[],
+        video_thumbnails TEXT[],
         is_public BOOLEAN DEFAULT true,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -253,6 +257,38 @@ const query = async (text, params) => {
 // 事务方法
 const getClient = async () => {
   return await pool.connect();
+};
+
+// 数据库迁移
+const migrateDatabase = async () => {
+  try {
+    const client = await pool.connect();
+    
+    // 检查并添加 video_thumbnails 字段
+    const checkColumnQuery = `
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'mood_posts' 
+      AND column_name = 'video_thumbnails'
+    `;
+    
+    const result = await client.query(checkColumnQuery);
+    
+    if (result.rows.length === 0) {
+      console.log('添加 video_thumbnails 字段到 mood_posts 表...');
+      await client.query(`
+        ALTER TABLE mood_posts 
+        ADD COLUMN video_thumbnails TEXT[]
+      `);
+      console.log('video_thumbnails 字段添加成功');
+    } else {
+      console.log('video_thumbnails 字段已存在，跳过添加');
+    }
+    
+    client.release();
+  } catch (error) {
+    console.error('数据库迁移失败:', error);
+  }
 };
 
 module.exports = {
