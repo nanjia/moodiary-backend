@@ -205,6 +205,19 @@ const migrateDatabase = async (client) => {
       }
     }
     
+    // 为 mood_posts 表添加 video_thumbnails 字段（如果不存在）
+    try {
+      await client.query(`
+        ALTER TABLE mood_posts 
+        ADD COLUMN IF NOT EXISTS video_thumbnails TEXT[]
+      `);
+      console.log('mood_posts 表添加 video_thumbnails 字段成功');
+    } catch (error) {
+      if (!error.message.includes('already exists')) {
+        console.error('添加 video_thumbnails 字段失败:', error);
+      }
+    }
+    
     console.log('数据库迁移完成');
   } catch (error) {
     console.error('数据库迁移失败:', error);
@@ -259,37 +272,6 @@ const getClient = async () => {
   return await pool.connect();
 };
 
-// 数据库迁移
-const migrateDatabase = async () => {
-  try {
-    const client = await pool.connect();
-    
-    // 检查并添加 video_thumbnails 字段
-    const checkColumnQuery = `
-      SELECT column_name 
-      FROM information_schema.columns 
-      WHERE table_name = 'mood_posts' 
-      AND column_name = 'video_thumbnails'
-    `;
-    
-    const result = await client.query(checkColumnQuery);
-    
-    if (result.rows.length === 0) {
-      console.log('添加 video_thumbnails 字段到 mood_posts 表...');
-      await client.query(`
-        ALTER TABLE mood_posts 
-        ADD COLUMN video_thumbnails TEXT[]
-      `);
-      console.log('video_thumbnails 字段添加成功');
-    } else {
-      console.log('video_thumbnails 字段已存在，跳过添加');
-    }
-    
-    client.release();
-  } catch (error) {
-    console.error('数据库迁移失败:', error);
-  }
-};
 
 module.exports = {
   pool,
