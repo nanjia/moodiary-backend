@@ -572,4 +572,273 @@ router.put('/avatar', authenticateToken, async (req, res) => {
   }
 });
 
+// ==================== 私信相关API ====================
+
+// 发送私信
+router.post('/:id/message', authenticateToken, async (req, res) => {
+  try {
+    const senderId = req.user.id;
+    const { id: receiverId } = req.params;
+    const { content } = req.body;
+
+    if (!content || content.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: '私信内容不能为空'
+      });
+    }
+
+    if (content.length > 1000) {
+      return res.status(400).json({
+        success: false,
+        message: '私信内容不能超过1000个字符'
+      });
+    }
+
+    if (senderId === parseInt(receiverId)) {
+      return res.status(400).json({
+        success: false,
+        message: '不能给自己发送私信'
+      });
+    }
+
+    // 检查接收者是否存在
+    const userResult = await query(
+      'SELECT id FROM users WHERE id = $1',
+      [receiverId]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: '接收者不存在'
+      });
+    }
+
+    // 插入私信
+    const result = await query(
+      'INSERT INTO private_messages (sender_id, receiver_id, content) VALUES ($1, $2, $3) RETURNING *',
+      [senderId, receiverId, content.trim()]
+    );
+
+    const message = result.rows[0];
+
+    res.json({
+      success: true,
+      message: '私信发送成功',
+      data: {
+        id: message.id,
+        content: message.content,
+        createdAt: message.created_at
+      }
+    });
+  } catch (error) {
+    console.error('发送私信失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '发送私信失败',
+      error: error.message
+    });
+  }
+});
+
+// 获取私信列表（收件箱）
+router.get('/messages', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { page = 1, pageSize = 20, type = 'received' } = req.query;
+
+    const offset = (page - 1) * pageSize;
+
+    let queryText, countQuery;
+    let queryParams;
+
+    if (type === 'sent') {
+      // 发送的私信
+      queryText = `
+        SELECT 
+          pm.id, pm.content, pm.created_at, pm.is_read,
+          u.id as receiver_id, u.username as receiver_username, u.nickname as receiver_nickname, u.avatar_url as receiver_avatar
+        FROM private_messages pm
+        JOIN users u ON pm.receiver_id = u.id
+        WHERE pm.sender_id = $1
+        ORDER BY pm.created_at DESC
+        LIMIT $2 OFFSET $3
+      `;
+      countQuery = 'SELECT COUNT(*) as total FROM private_messages WHERE sender_id = $1';
+      queryParams = [userId, pageSize, offset];
+    } else {
+      // 接收的私信
+      queryText = `
+        SELECT 
+          pm.id, pm.content, pm.created_at, pm.is_read,
+          u.id as sender_id, u.username as sender_username, u.nickname as sender_nickname, u.avatar_url as sender_avatar
+        FROM private_messages pm
+        JOIN users u ON pm.sender_id = u.id
+        WHERE pm.receiver_id = $1
+        ORDER BY pm.created_at DESC
+        LIMIT $2 OFFSET $3
+      `;
+      countQuery = 'SELECT COUNT(*) as total FROM private_messages WHERE receiver_id = $1';
+      queryParams = [userId, pageSize, offset];
+    }
+
+    const result = await query(queryText, queryParams);
+    const countResult = await query(countQuery, [userId]);
+
+    const total = parseInt(countResult.rows[0].total);
+    const totalPages = Math.ceil(total / pageSize);
+
+    res.json({
+      success: true,
+      data: {
+        items: result.rows,
+        total,
+        page: parseInt(page),
+        pageSize: parseInt(pageSize),
+        totalPages
+      }
+    });
+  } catch (error) {
+    console.error('获取私信列表失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '获取私信列表失败',
+      error: error.message
+    });
+  }
+});
+
+// 获取与特定用户的私信对话
+router.get('/:id/conversation', authenticateToken, async (req, res) => {
+  try {
+    const currentUserId = req.user.id;
+    const { id: otherUserId } = req.params;
+    const { page = 1, pageSize = 50 } = req.query;
+
+    const offset = (page - 1) * pageSize;
+
+    // 检查用户是否存在
+    const userResult = await query(
+      'SELECT id, username, nickname, avatar_url FROM users WHERE id = $1',
+      [otherUserId]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: '用户不存在'
+      });
+    }
+
+    const otherUser = userResult.rows[0];
+
+    // 获取对话消息
+    const result = await query(
+      `SELECT 
+        pm.id, pm.content, pm.created_at, pm.is_read,
+        pm.sender_id, pm.receiver_id,
+        CASE 
+          WHEN pm.sender_id = $1 THEN 'sent'
+          ELSE 'received'
+        END as message_type
+      FROM private_messages pm
+      WHERE (pm.sender_id = $1 AND pm.receiver_id = $2) 
+         OR (pm.sender_id = $2 AND pm.receiver_id = $1)
+      ORDER BY pm.created_at DESC
+      LIMIT $3 OFFSET $4`,
+      [currentUserId, otherUserId, pageSize, offset]
+    );
+
+    // 标记消息为已读
+    await query(
+      'UPDATE private_messages SET is_read = true WHERE receiver_id = $1 AND sender_id = $2 AND is_read = false',
+      [currentUserId, otherUserId]
+    );
+
+    res.json({
+      success: true,
+      data: {
+        otherUser: {
+          id: otherUser.id,
+          username: otherUser.username,
+          nickname: otherUser.nickname,
+          avatarUrl: otherUser.avatar_url
+        },
+        messages: result.rows.reverse(), // 按时间正序排列
+        total: result.rows.length,
+        page: parseInt(page),
+        pageSize: parseInt(pageSize)
+      }
+    });
+  } catch (error) {
+    console.error('获取对话失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '获取对话失败',
+      error: error.message
+    });
+  }
+});
+
+// 标记私信为已读
+router.put('/messages/:id/read', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { id: messageId } = req.params;
+
+    const result = await query(
+      'UPDATE private_messages SET is_read = true WHERE id = $1 AND receiver_id = $2 RETURNING *',
+      [messageId, userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: '私信不存在或无权限'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: '标记已读成功'
+    });
+  } catch (error) {
+    console.error('标记私信已读失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '标记私信已读失败',
+      error: error.message
+    });
+  }
+});
+
+// 获取未读私信数量
+router.get('/messages/unread-count', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const result = await query(
+      'SELECT COUNT(*) as count FROM private_messages WHERE receiver_id = $1 AND is_read = false',
+      [userId]
+    );
+
+    const unreadCount = parseInt(result.rows[0].count);
+
+    res.json({
+      success: true,
+      data: {
+        unreadCount
+      }
+    });
+  } catch (error) {
+    console.error('获取未读私信数量失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '获取未读私信数量失败',
+      error: error.message
+    });
+  }
+});
+
 module.exports = router;
